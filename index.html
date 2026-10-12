@@ -9,7 +9,7 @@
   :root {
     --bg: #0f172a; --panel: #1e293b; --line: #334155;
     --text: #f1f5f9; --muted: #94a3b8; --accent: #38bdf8;
-    --cue: #facc15; --target: #e2e8f0; --danger: #f87171; --ok: #4ade80;
+    --rect: #facc15; --ball: #f8fafc; --go: #38bdf8; --nogo: #ef4444;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body {
@@ -27,15 +27,28 @@
   .screen.active { display: flex; }
   h1 { font-size: 1.5rem; } h2 { font-size: 1.25rem; }
   .muted { color: var(--muted); font-size: .9rem; }
-  .warn { color: var(--cue); font-size: .95rem; }
+  .warn { color: var(--rect); font-size: .95rem; }
   .card { background: var(--panel); border-radius: 12px; padding: 16px; }
+  .card p + p { margin-top: 8px; }
   ol { padding-left: 22px; } li { margin-bottom: 8px; }
 
-  .field { margin-bottom: 14px; }
-  label { display: block; font-weight: 600; margin-bottom: 6px; }
-  input, select { width: 100%; font-size: 1rem; padding: 12px; border-radius: 10px;
-                  border: 1px solid var(--line); background: var(--panel); color: var(--text);
-                  -webkit-user-select: text; user-select: text; }
+  .field { margin-bottom: 4px; }
+  label.title, legend { display: block; font-weight: 600; margin-bottom: 8px; }
+  fieldset { border: none; margin-bottom: 18px; }
+  input[type=text] { width: 100%; font-size: 1rem; padding: 12px; border-radius: 10px;
+                     border: 1px solid var(--line); background: var(--panel); color: var(--text);
+                     -webkit-user-select: text; user-select: text; }
+
+  /* Tap-friendly answer chips */
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chips.scale { display: grid; grid-template-columns: repeat(5, 1fr); }
+  .chip { position: relative; }
+  .chip input { position: absolute; opacity: 0; pointer-events: none; }
+  .chip span { display: block; padding: 10px 14px; border-radius: 999px; text-align: center;
+               border: 1px solid var(--line); background: var(--panel); cursor: pointer; }
+  .chips.scale .chip span { border-radius: 10px; padding: 10px 0; }
+  .chip input:checked + span { background: var(--accent); border-color: var(--accent); color: #0f172a; font-weight: 700; }
+  .chip input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
 
   .btn { display: block; width: 100%; padding: 16px; font-size: 1.1rem; font-weight: 700;
          border: none; border-radius: 12px; background: var(--accent); color: #0f172a; cursor: pointer; }
@@ -47,32 +60,36 @@
   #hud { display: flex; justify-content: space-between; padding: 8px 16px;
          padding-top: calc(8px + env(safe-area-inset-top)); color: var(--muted); font-size: .85rem; }
   #arena { position: relative; flex: 1; overflow: hidden; border-top: 1px solid var(--panel);
-           border-bottom: 1px solid var(--panel); }
-  #target { position: absolute; left: 0; top: 0; width: 36px; height: 36px; margin: -18px 0 0 -18px;
-            border-radius: 50%; background: var(--target);
-            box-shadow: 0 0 0 6px rgba(226,232,240,.15); will-change: transform; }
-  .cue { position: absolute; width: 60px; height: 60px; border-radius: 12px;
-         background: var(--cue); visibility: hidden; }
-  .cue.show { visibility: visible; }
-  #cue-left  { left: 10px;  top: 50%; margin-top: -30px; }
-  #cue-right { right: 10px; top: 50%; margin-top: -30px; }
-  #cue-up    { top: 10px;   left: 50%; margin-left: -30px; }
+           border-bottom: 1px solid var(--panel); touch-action: none; }
+  #divider { position: absolute; top: 0; bottom: 0; left: 50%; border-left: 2px dashed var(--line); display: none; }
+  #ball { position: absolute; left: 0; top: 0; width: 40px; height: 40px; margin: -20px 0 0 -20px;
+          border-radius: 50%; background: var(--ball); display: none; will-change: transform; }
+  .rect { position: absolute; width: 56px; height: 90px; margin-top: -45px; border-radius: 10px;
+          background: var(--rect); visibility: hidden; }
+  #rect-left { left: 14px; } #rect-right { right: 14px; }
+  .rect.show { visibility: visible; }
+  #pop { position: absolute; width: 56px; height: 56px; margin: -28px 0 0 -28px; border-radius: 50%;
+         visibility: hidden; }
+  #pop.show { visibility: visible; }
   #message { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%);
-             padding: 8px 16px; border-radius: 999px; background: rgba(15,23,42,.9);
+             padding: 8px 16px; border-radius: 999px; background: rgba(15,23,42,.92);
              font-weight: 700; opacity: 0; transition: opacity .15s; pointer-events: none; white-space: nowrap; }
   #message.show { opacity: 1; }
-  #controls { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;
-              padding: 12px 12px calc(12px + env(safe-area-inset-bottom)); }
-  .dir-btn { height: clamp(72px, 14vh, 110px); font-size: 2rem; border: none; border-radius: 16px;
-             background: var(--line); color: var(--text); touch-action: none; }
-  .dir-btn:active { background: #475569; }
+  #controls { padding: 12px 12px calc(12px + env(safe-area-inset-bottom)); }
+  .ctl { display: none; gap: 10px; }
+  .ctl.show { display: grid; }
+  #ctl-lr { grid-template-columns: 1fr 1fr; }
+  .resp-btn { height: clamp(80px, 15vh, 120px); font-size: 1.4rem; font-weight: 700; border: none;
+              border-radius: 16px; background: var(--line); color: var(--text); touch-action: none; }
+  .resp-btn:active { background: #475569; }
 
-  /* ---------- Overlay (practice end, rests, pauses) ---------- */
-  #overlay { position: fixed; inset: 0; background: rgba(15,23,42,.96); display: none;
+  /* ---------- Overlay (instructions between tests, breaks, pauses) ---------- */
+  #overlay { position: fixed; inset: 0; background: rgba(15,23,42,.97); display: none;
              align-items: center; justify-content: center; flex-direction: column; gap: 16px;
-             padding: 24px; text-align: center; z-index: 10; }
+             padding: 24px; text-align: center; z-index: 10; overflow-y: auto; }
   #overlay.show { display: flex; }
   #overlay .btn { max-width: 360px; }
+  #overlay p { max-width: 460px; }
   .big { font-size: 3rem; font-weight: 800; }
 
   table { width: 100%; border-collapse: collapse; font-size: .9rem; }
@@ -81,113 +98,113 @@
 </head>
 <body>
 
-<!-- ================= 1. SETUP ================= -->
-<section id="screen-setup" class="screen active">
+<!-- ================= 1. QUESTIONS ================= -->
+<section id="screen-q" class="screen active">
   <h1>Reaction Time Study</h1>
-  <p class="muted">Please answer a few short questions before the test. No names are collected.</p>
+  <div class="card">
+    <p>Before the test, a few short questions about how you are right now.</p>
+    <p><strong>All questions are optional.</strong> You can leave out any question you don't want to answer,
+       or skip the whole section with the button at the bottom. Tap a selected answer again to remove it.</p>
+  </div>
 
   <div class="field">
-    <label for="code">Participant code</label>
-    <input id="code" autocomplete="off" autocapitalize="characters" placeholder="e.g. P01">
+    <label class="title" for="code">Participant number</label>
+    <input type="text" id="code" autocomplete="off" autocapitalize="characters" placeholder="e.g. P01">
+    <p class="muted">Needed to link your sessions together. No names are collected.</p>
   </div>
-  <div class="field">
-    <label for="sessionType">Type of session</label>
-    <select id="sessionType">
-      <option value="scheduled">Scheduled session</option>
-      <option value="self_tired">My choice – I feel tired now</option>
-      <option value="self_alert">My choice – I feel alert now</option>
-    </select>
-  </div>
-  <div class="field">
-    <label for="slot">Moment of the day</label>
-    <select id="slot">
-      <option value="morning">Morning</option>
-      <option value="midday">Midday</option>
-      <option value="afternoon">Afternoon</option>
-      <option value="evening">Evening</option>
-    </select>
-  </div>
-  <div class="field">
-    <label for="sleep">How many hours did you sleep last night?</label>
-    <input id="sleep" type="number" inputmode="decimal" min="0" max="16" step="0.5" placeholder="e.g. 7">
-  </div>
-  <div class="field">
-    <label for="activity">What were you mainly doing in the last hour?</label>
-    <select id="activity">
-      <option value="">– choose –</option>
-      <option value="resting">Resting / relaxing</option>
-      <option value="moving">Moving around / driving my wheelchair</option>
-      <option value="screen">Work or study at a screen</option>
-      <option value="household">Household tasks</option>
-      <option value="social">Social activity</option>
-      <option value="eating">Eating</option>
-      <option value="other">Other</option>
-    </select>
-  </div>
-  <div class="field">
-    <label for="temp">How warm do you feel?</label>
-    <select id="temp">
-      <option value="">– choose –</option>
-      <option value="cold">Cold</option>
-      <option value="comfortable">Comfortable</option>
-      <option value="warm">Warm</option>
-      <option value="hot">Hot</option>
-    </select>
-  </div>
-  <div class="field" id="tirednessField">
-    <label for="tired">How tired do you feel right now? (0 = not at all, 10 = extremely)</label>
-    <select id="tired"></select>
+
+  <div id="qSection">
+    <fieldset>
+      <legend>Which device are you using for the test?</legend>
+      <div class="chips">
+        <label class="chip"><input type="radio" name="device" value="mobile_phone"><span>Mobile phone</span></label>
+        <label class="chip"><input type="radio" name="device" value="laptop"><span>Laptop</span></label>
+        <label class="chip"><input type="radio" name="device" value="tablet"><span>Tablet</span></label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>What time of day is it?</legend>
+      <div class="chips">
+        <label class="chip"><input type="radio" name="slot" value="morning"><span>Morning</span></label>
+        <label class="chip"><input type="radio" name="slot" value="midday"><span>Midday</span></label>
+        <label class="chip"><input type="radio" name="slot" value="afternoon"><span>Afternoon</span></label>
+        <label class="chip"><input type="radio" name="slot" value="evening"><span>Evening</span></label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>What were you doing in the last hour? <span class="muted">(choose all that apply)</span></legend>
+      <div class="chips">
+        <label class="chip"><input type="checkbox" name="activity" value="house_chores"><span>House chores</span></label>
+        <label class="chip"><input type="checkbox" name="activity" value="work_study"><span>Work / study</span></label>
+        <label class="chip"><input type="checkbox" name="activity" value="exercise"><span>Exercise</span></label>
+        <label class="chip"><input type="checkbox" name="activity" value="social"><span>Social activities</span></label>
+        <label class="chip"><input type="checkbox" name="activity" value="relaxing"><span>Relaxing / resting</span></label>
+        <label class="chip"><input type="checkbox" name="activity" value="moving_travelling"><span>Moving around / travelling</span></label>
+        <label class="chip"><input type="checkbox" name="activity" value="other"><span>Other</span></label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>How tired do you feel right now?</legend>
+      <div class="chips scale" id="tiredScale"></div>
+      <p class="muted" style="margin-top:6px">1 = not tired at all · 10 = extremely tired</p>
+    </fieldset>
   </div>
 
   <p id="gapWarning" class="warn" hidden></p>
-  <p id="setupError" class="warn" hidden></p>
-  <button class="btn" id="btnSetupNext">Continue</button>
+  <p id="qError" class="warn" hidden></p>
+  <button class="btn" id="btnQContinue">Continue</button>
+  <button class="btn secondary" id="btnQSkip">Skip these questions</button>
   <p id="pendingNote" class="muted" hidden></p>
 </section>
 
-<!-- ================= 2. INSTRUCTIONS ================= -->
+<!-- ================= 2. GENERAL INSTRUCTIONS ================= -->
 <section id="screen-instructions" class="screen">
-  <h1>How the test works</h1>
+  <h1>How the session works</h1>
   <div class="card">
     <ol>
-      <li>A <strong>white circle</strong> moves slowly around the screen. Keep your eyes on it the whole time.</li>
-      <li>Sometimes a <strong>yellow square</strong> appears at the <strong>left</strong>, <strong>top</strong> or <strong>right</strong> edge of the screen.</li>
-      <li>As soon as you see it, press the matching arrow button (◀ ▲ ▶) <strong>as fast as you can</strong>.</li>
-      <li>Do not press before the square appears.</li>
-      <li>The test has <strong id="instrBlocks">3</strong> short parts with a break in between (about <strong id="instrMinutes">7</strong> minutes in total).</li>
+      <li>There are <strong>3 short tests</strong>, about <strong id="instrMinutes">5</strong> minutes in total.</li>
+      <li>Before each test you'll see what to do and get a <strong>short try-out</strong>.</li>
+      <li>Respond <strong>as fast as you can</strong>, but don't press before something appears.</li>
+      <li>There is a short break between the tests.</li>
     </ol>
   </div>
   <div class="card muted">
     Before you start: sit as you normally do, use the same device and hand as in your other sessions,
-    and turn on <em>Do Not Disturb</em> so notifications don't interrupt you.
-    You can stop at any time.
+    and turn on <em>Do Not Disturb</em> so notifications don't interrupt you. You can stop at any time.
   </div>
-  <p class="muted">You will first do a short practice round.</p>
-  <button class="btn" id="btnStartPractice">Start practice</button>
-  <button class="btn secondary" id="btnBackSetup">Back</button>
+  <button class="btn" id="btnStart">Start</button>
+  <button class="btn secondary" id="btnBack">Back</button>
 </section>
 
 <!-- ================= 3. TEST ================= -->
 <section id="screen-test" class="screen">
-  <div id="hud"><span id="hudBlock">Practice</span><span id="hudHint">Keep your eyes on the circle</span></div>
+  <div id="hud"><span id="hudTest"></span><span id="hudMode"></span></div>
   <div id="arena">
-    <div id="target"></div>
-    <div class="cue" id="cue-left"></div>
-    <div class="cue" id="cue-up"></div>
-    <div class="cue" id="cue-right"></div>
+    <div id="divider"></div>
+    <div id="ball"></div>
+    <div class="rect" id="rect-left"></div>
+    <div class="rect" id="rect-right"></div>
+    <div id="pop"></div>
     <div id="message"></div>
   </div>
   <div id="controls">
-    <button class="dir-btn" data-dir="left"  aria-label="Left">◀</button>
-    <button class="dir-btn" data-dir="up"    aria-label="Top">▲</button>
-    <button class="dir-btn" data-dir="right" aria-label="Right">▶</button>
+    <div class="ctl" id="ctl-lr">
+      <button class="resp-btn" data-input="left" aria-label="Left">◀ Left</button>
+      <button class="resp-btn" data-input="right" aria-label="Right">Right ▶</button>
+    </div>
+    <div class="ctl" id="ctl-press">
+      <button class="resp-btn" data-input="press">Colour changed!</button>
+    </div>
   </div>
 </section>
 
 <!-- ================= 4. DONE ================= -->
 <section id="screen-done" class="screen">
   <h1>Thank you!</h1>
-  <p>The test is complete.</p>
+  <p>The session is complete.</p>
   <div class="card"><p id="sendStatus">Sending results…</p></div>
   <button class="btn" id="btnRetry" hidden>Retry sending</button>
   <div id="resultsBox" hidden></div>
@@ -202,68 +219,97 @@
    CONFIGURATION – change these values to adapt the study
    ===================================================================== */
 const CONFIG = {
-  FORMSPREE_ENDPOINT: 'https://formspree.io/f/xnpjzreo', // <- paste your Formspree form URL
-  APP_VERSION: '1.0',
+  FORMSPREE_ENDPOINT: 'https://formspree.io/f/YOUR_FORM_ID', // <- paste your Formspree form URL
+  APP_VERSION: '2.0',
 
-  // Blocked design
-  N_BLOCKS: 3,              // number of test blocks per session
-  BLOCK_DURATION_S: 120,    // length of each block (seconds)
-  REST_DURATION_S: 30,      // compulsory rest between blocks (seconds)
-  PRACTICE_TRIALS: 5,       // practice trials (not included in results)
+  // Session structure (3 tests)
+  PRACTICE_S: 10,         // try-out before each test, in seconds (3 tests x 10 s = 30 s)
+  TEST_S: 75,             // length of each test, in seconds
+  REST_S: 15,             // break between tests, in seconds
+  RANDOMIZE_ORDER: false, // true = the 3 tests come in a random order each session
 
-  // Trial timing
-  ISI_MIN_MS: 2000,         // shortest random wait before a cue
-  ISI_MAX_MS: 10000,        // longest random wait before a cue
-  RESPONSE_TIMEOUT_MS: 2000,// no response within this time = miss
-  ANTICIPATION_MS: 150,     // responses faster than this after cue = anticipation (false start)
-  LAPSE_THRESHOLD_MS: 1000, // slow responses above this count as lapses (calibrate after pilot)
+  // Timing per test (milliseconds)
+  TESTS: {
+    t1: { ISI_MIN: 1500, ISI_MAX: 4000, TIMEOUT: 1500 },                  // left / right rectangles
+    t2: { ISI_MIN: 1000, ISI_MAX: 3000, TIMEOUT: 1500, NOGO_PROB: 0.2 },  // tap the ball (20% red = don't tap)
+    t3: { ISI_MIN: 1500, ISI_MAX: 4000, TIMEOUT: 1500 }                   // colour change
+  },
+
+  // Test 3: the two versions. Each session gets ONE of them at random.
+  T3_GREEN: '#22c55e',
+  T3_COLOURS: ['#22c55e', '#f97316', '#3b82f6', '#eab308', '#a855f7', '#ef4444', '#ec4899'],
+
+  // Scoring
+  ANTICIPATION_MS: 150,     // responses faster than this = anticipation (too early)
+  LAPSE_THRESHOLD_MS: 1000, // correct responses slower than this count as lapses
   DEBOUNCE_MS: 250,         // ignore repeated taps right after a response (tremor protection)
+  TAP_TOLERANCE: 1.6,       // test 2: how far from the ball a tap still counts (1 = exactly on the ball)
 
-  // Moving target
-  TARGET_SPEED: 0.6,        // higher = faster movement
-  TARGET_MARGIN_PX: 100,    // keeps the target away from the cue positions
+  // Moving ball (tests 1 and 3)
+  BALL_SPEED: 0.6,          // higher = faster
 
-  // Questionnaire & behaviour
-  ASK_TIREDNESS: true,      // set to false if your ethics committee does not allow it
   MIN_GAP_MIN: 60,          // warn if a session starts sooner than this after the previous one
   SHOW_RESULTS_TO_PARTICIPANT: false
 };
 
-const DIRECTIONS = ['left', 'up', 'right'];
-const KEY_MAP = { ArrowLeft: 'left', ArrowUp: 'up', ArrowRight: 'right' };
+const IS_TOUCH = navigator.maxTouchPoints > 0;
+const TEST_INFO = {
+  t1: {
+    name: 'Left or right',
+    text: () => `<p>The screen is split into two halves. Keep your eyes on the <strong>white ball</strong> as it moves.</p>
+      <p>When a <strong style="color:var(--rect)">yellow rectangle</strong> appears on the <strong>left</strong> or <strong>right</strong> side,
+      press the matching button as fast as you can.</p>
+      ${IS_TOUCH ? '' : '<p class="muted">On a computer you can also use the ← and → keys.</p>'}`
+  },
+  t2: {
+    name: 'Tap the ball',
+    text: () => `<p><strong style="color:var(--go)">Blue balls</strong> will appear in different places on the screen.
+      Tap each blue ball as fast as you can.</p>
+      <p>If a <strong style="color:var(--nogo)">red ball</strong> appears, <strong>do not tap it</strong> – just wait.</p>
+      ${IS_TOUCH ? '' : '<p class="muted">On a computer, click the ball with the mouse.</p>'}`
+  },
+  t3: {
+    name: 'Colour change',
+    text: v => `<p>Keep your eyes on the <strong>white ball</strong> as it moves.</p>
+      <p>${v === 'green'
+        ? 'When it turns <strong style="color:#22c55e">green</strong>, press the big button as fast as you can.'
+        : 'When it <strong>changes colour</strong> (it can be any colour), press the big button as fast as you can.'}</p>
+      ${IS_TOUCH ? '' : '<p class="muted">On a computer you can also press the space bar.</p>'}`
+  }
+};
 
 /* =====================================================================
    STATE
    ===================================================================== */
 const $ = id => document.getElementById(id);
 const S = {
-  meta: null, trials: [], events: [],
-  running: false, paused: false, isPractice: false,
-  block: 0, trialInBlock: 0, practiceDone: 0,
-  phase: 'idle',            // 'idle' | 'waiting' | 'cue'
-  cueDir: null, onset: 0, currentIsi: 0,
-  isiTimer: null, timeoutTimer: null,
-  blockEndsAt: 0, blockRemaining: 0,
-  ignoreUntil: 0, t0: 0, animId: null,
-  inputs: new Set(), wakeLock: null, payload: null
+  meta: null, trials: [], events: [], inputs: new Set(),
+  order: [], testIdx: 0, t3Variant: 'green',
+  running: false, paused: false, segActive: false,
+  test: null, mode: null, segDur: 0, endsAt: 0, remaining: 0, onDone: null,
+  phase: 'idle',            // 'idle' | 'waiting' | 'stim'
+  stim: null, onset: 0, isi: 0, trialNo: 0, lastColour: null,
+  isiTimer: null, timeoutTimer: null, readyTimer: null,
+  ignoreUntil: 0, t0: 0, animId: null, ball: { x: 0, y: 0 },
+  wakeLock: null, payload: null
 };
 
 /* =====================================================================
    HELPERS
    ===================================================================== */
-function showScreen(id) {
-  document.querySelectorAll('.screen').forEach(s => s.classList.toggle('active', s.id === id));
-}
+function showScreen(id) { document.querySelectorAll('.screen').forEach(s => s.classList.toggle('active', s.id === id)); }
 const rand = (min, max) => Math.round(min + Math.random() * (max - min));
+const pick = a => a[Math.floor(Math.random() * a.length)];
 const now = () => performance.now();
 const round = (x, d = 1) => (x == null || isNaN(x)) ? null : Math.round(x * 10 ** d) / 10 ** d;
 function median(a) { if (!a.length) return null; const s = [...a].sort((x, y) => x - y); const m = Math.floor(s.length / 2); return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; }
 function mean(a) { return a.length ? a.reduce((x, y) => x + y, 0) / a.length : null; }
 function sd(a) { if (a.length < 2) return null; const m = mean(a); return Math.sqrt(a.reduce((s, x) => s + (x - m) ** 2, 0) / (a.length - 1)); }
 function uuid() { return (crypto.randomUUID && crypto.randomUUID()) || 'id-' + Date.now() + '-' + Math.random().toString(16).slice(2); }
-function store(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) {} }
-function load(key, fallback) { try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; } catch (e) { return fallback; } }
+function store(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+function load(k, f) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : f; } catch (e) { return f; } }
 function todayKey() { const d = new Date(); return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`; }
+function shuffle(a) { a = [...a]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
 
 function flash(text, ms = 900) {
   const m = $('message'); m.textContent = text; m.classList.add('show');
@@ -286,27 +332,27 @@ function showOverlay({ html, buttonText, onClick, countdown = 0 }) {
 }
 
 /* =====================================================================
-   SETUP SCREEN
+   QUESTIONS SCREEN
    ===================================================================== */
-function initSetup() {
-  // tiredness scale
-  const sel = $('tired');
-  sel.innerHTML = '<option value="">– choose –</option>' +
-    Array.from({ length: 11 }, (_, i) => `<option value="${i}">${i}</option>`).join('');
-  $('tirednessField').hidden = !CONFIG.ASK_TIREDNESS;
+const lastRadio = {};
+function initQuestions() {
+  $('tiredScale').innerHTML = Array.from({ length: 10 }, (_, i) =>
+    `<label class="chip"><input type="radio" name="tired" value="${i + 1}"><span>${i + 1}</span></label>`).join('');
 
-  // suggest moment of day from the clock
-  const h = new Date().getHours();
-  $('slot').value = h < 11 ? 'morning' : h < 14 ? 'midday' : h < 18 ? 'afternoon' : 'evening';
+  // tapping a selected radio answer again removes it (so any question can be left blank)
+  document.querySelectorAll('input[type=radio]').forEach(r => {
+    r.addEventListener('click', () => {
+      if (lastRadio[r.name] === r.value) { r.checked = false; lastRadio[r.name] = null; }
+      else lastRadio[r.name] = r.value;
+    });
+  });
 
-  // remember participant code on this device
   $('code').value = load('rt_code', '');
   updateGapWarning();
   $('code').addEventListener('input', updateGapWarning);
 
-  $('instrBlocks').textContent = CONFIG.N_BLOCKS;
-  const totalMin = (CONFIG.N_BLOCKS * CONFIG.BLOCK_DURATION_S + (CONFIG.N_BLOCKS - 1) * CONFIG.REST_DURATION_S) / 60 + 1;
-  $('instrMinutes').textContent = Math.round(totalMin);
+  const totalS = 3 * CONFIG.PRACTICE_S + 3 * CONFIG.TEST_S + 2 * CONFIG.REST_S;
+  $('instrMinutes').textContent = Math.round(totalS / 60);
 
   const pending = load('rt_pending', []);
   if (pending.length) {
@@ -316,10 +362,12 @@ function initSetup() {
   }
 }
 
+function getRadio(name) { const el = document.querySelector(`input[name="${name}"]:checked`); return el ? el.value : ''; }
+function getChecks(name) { return [...document.querySelectorAll(`input[name="${name}"]:checked`)].map(e => e.value).join(', '); }
+
 function updateGapWarning() {
   const code = $('code').value.trim().toUpperCase();
-  const last = load('rt_last_' + code, null);
-  const w = $('gapWarning');
+  const last = load('rt_last_' + code, null), w = $('gapWarning');
   if (code && last) {
     const mins = (Date.now() - new Date(last).getTime()) / 60000;
     if (mins < CONFIG.MIN_GAP_MIN) {
@@ -331,199 +379,270 @@ function updateGapWarning() {
   w.hidden = true;
 }
 
-$('btnSetupNext').addEventListener('click', () => {
-  const code = $('code').value.trim().toUpperCase();
-  const err = $('setupError');
-  if (!/^[A-Z0-9-]{2,12}$/.test(code)) { err.hidden = false; err.textContent = 'Please enter your participant code (letters and numbers only).'; return; }
-  if (!$('activity').value || !$('temp').value || (CONFIG.ASK_TIREDNESS && $('tired').value === '')) {
-    err.hidden = false; err.textContent = 'Please answer all questions.'; return;
+function submitQuestions(skipped) {
+  const code = $('code').value.trim().toUpperCase(), err = $('qError');
+  if (!/^[A-Z0-9-]{1,12}$/.test(code)) {
+    err.hidden = false; err.textContent = 'Please enter your participant number (letters and numbers only).'; return;
   }
   err.hidden = true;
   store('rt_code', code);
 
-  const last = load('rt_last_' + code, null);
-  const startedAt = new Date();
+  const last = load('rt_last_' + code, null), started = new Date();
   S.meta = {
     session_id: uuid(),
-    participant_code: code,
-    session_type: $('sessionType').value,
-    time_slot: $('slot').value,
-    started_at_local: startedAt.toString(),
-    started_at_iso: startedAt.toISOString(),
-    local_hour: startedAt.getHours() + startedAt.getMinutes() / 60,
+    participant_number: code,
+    questions_skipped: skipped,
+    device: skipped ? '' : getRadio('device'),
+    time_of_day: skipped ? '' : getRadio('slot'),
+    activities_last_hour: skipped ? '' : getChecks('activity'),
+    tiredness_1_10: skipped ? '' : getRadio('tired'),
+    started_at_local: started.toString(),
+    started_at_iso: started.toISOString(),
+    local_hour: round(started.getHours() + started.getMinutes() / 60, 2),
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-    minutes_since_last_session: last ? Math.round((startedAt - new Date(last)) / 60000) : '',
+    minutes_since_last_session: last ? Math.round((started - new Date(last)) / 60000) : '',
     sessions_today_before_this: load(`rt_count_${code}_${todayKey()}`, 0),
-    sleep_hours: $('sleep').value,
-    activity_last_hour: $('activity').value,
-    thermal_feeling: $('temp').value,
-    tiredness_0_10: CONFIG.ASK_TIREDNESS ? $('tired').value : 'not asked',
-    device_user_agent: navigator.userAgent,
-    device_screen: `${screen.width}x${screen.height} @${window.devicePixelRatio}x`,
-    device_touch: navigator.maxTouchPoints > 0
+    auto_user_agent: navigator.userAgent,
+    auto_screen: `${screen.width}x${screen.height} @${window.devicePixelRatio}x`,
+    auto_touch: IS_TOUCH
   };
   showScreen('screen-instructions');
-});
+}
 
-$('btnBackSetup').addEventListener('click', () => showScreen('screen-setup'));
-$('btnStartPractice').addEventListener('click', () => startTest());
+$('btnQContinue').addEventListener('click', () => submitQuestions(false));
+$('btnQSkip').addEventListener('click', () => submitQuestions(true));
+$('btnBack').addEventListener('click', () => showScreen('screen-q'));
+$('btnStart').addEventListener('click', () => startSession());
 
 /* =====================================================================
-   TEST FLOW
+   SESSION FLOW
    ===================================================================== */
-async function startTest() {
+async function startSession() {
   S.trials = []; S.events = []; S.inputs = new Set();
-  S.isPractice = true; S.block = 0; S.practiceDone = 0;
+  S.order = CONFIG.RANDOMIZE_ORDER ? shuffle(['t1', 't2', 't3']) : ['t1', 't2', 't3'];
+  S.t3Variant = Math.random() < 0.5 ? 'green' : 'multicolour';
+  S.testIdx = 0;
   showScreen('screen-test');
 
-  // best effort: fullscreen, portrait, keep screen awake
   try { await document.documentElement.requestFullscreen?.(); } catch (e) {}
   try { await screen.orientation?.lock?.('portrait'); } catch (e) {}
   try { S.wakeLock = await navigator.wakeLock?.request('screen'); } catch (e) {}
 
   S.t0 = now();
   S.running = true;
-  resizeArena();
   startAnimation();
-  beginBlock();
+  introTest();
 }
 
-function beginBlock() {
-  S.trialInBlock = 0;
-  S.phase = 'idle';
-  $('hudBlock').textContent = S.isPractice ? 'Practice' : `Part ${S.block} of ${CONFIG.N_BLOCKS}`;
-  if (!S.isPractice) {
-    S.blockEndsAt = now() + CONFIG.BLOCK_DURATION_S * 1000;
-    logEvent('block_start');
-  }
-  flash('Get ready…', 1500);
-  setTimeout(scheduleNext, 1500);
-}
-
-function scheduleNext() {
-  if (!S.running || S.paused) return;
-  if (S.isPractice && S.practiceDone >= CONFIG.PRACTICE_TRIALS) return endPractice();
-  if (!S.isPractice && now() >= S.blockEndsAt) return endBlock();
-
-  S.currentIsi = rand(CONFIG.ISI_MIN_MS, CONFIG.ISI_MAX_MS);
-  S.phase = 'waiting';
-  S.isiTimer = setTimeout(showCue, S.currentIsi);
-}
-
-function showCue() {
-  requestAnimationFrame(() => {
-    if (!S.running || S.paused) return;
-    S.cueDir = DIRECTIONS[Math.floor(Math.random() * DIRECTIONS.length)];
-    $('cue-' + S.cueDir).classList.add('show');
-    S.onset = now();            // the cue is painted on the next frame (constant ~1 frame offset)
-    S.phase = 'cue';
-    S.timeoutTimer = setTimeout(onMiss, CONFIG.RESPONSE_TIMEOUT_MS);
-  });
-}
-
-function hideCues() { document.querySelectorAll('.cue').forEach(c => c.classList.remove('show')); }
-
-function respond(dir, t, source) {
-  if (!S.running || S.paused) return;
-  S.inputs.add(source);
-  if (t < S.ignoreUntil) return;
-  S.ignoreUntil = t + CONFIG.DEBOUNCE_MS;
-
-  if (S.phase === 'waiting') {
-    // pressed before any cue appeared
-    clearTimeout(S.isiTimer);
-    logEvent('false_start', { response: dir });
-    S.phase = 'idle';
-    flash('Too early – wait for the square');
-    setTimeout(scheduleNext, 1000);
-    return;
-  }
-
-  if (S.phase === 'cue') {
-    clearTimeout(S.timeoutTimer);
-    hideCues();
-    S.phase = 'idle';
-    const rt = t - S.onset;
-    let outcome;
-    if (rt < CONFIG.ANTICIPATION_MS) outcome = 'anticipation';
-    else outcome = dir === S.cueDir ? 'hit' : 'wrong_direction';
-    recordTrial({ response: dir, rt, outcome });
-
-    if (S.isPractice) {
-      flash(outcome === 'hit' ? 'Good' : outcome === 'wrong_direction' ? 'Wrong direction' : 'Too early');
-      S.practiceDone++;
-    } else if (outcome === 'anticipation') {
-      flash('Too early – wait for the square');
-    }
-    setTimeout(scheduleNext, 300);
-  }
-}
-
-function onMiss() {
-  if (S.phase !== 'cue') return;
-  hideCues();
-  S.phase = 'idle';
-  recordTrial({ response: null, rt: null, outcome: 'miss' });
-  if (S.isPractice) { flash('Missed – try to respond faster'); S.practiceDone++; }
-  scheduleNext();
-}
-
-function recordTrial({ response, rt, outcome }) {
-  S.trialInBlock++;
-  S.trials.push({
-    block: S.block,
-    practice: S.isPractice,
-    trial: S.trialInBlock,
-    cue_dir: S.cueDir,
-    response,
-    rt_ms: round(rt, 1),
-    outcome,
-    lapse: outcome === 'miss' || (rt != null && rt > CONFIG.LAPSE_THRESHOLD_MS && outcome !== 'anticipation'),
-    isi_ms: S.currentIsi,
-    onset_ms: round(S.onset - S.t0, 1)
-  });
-}
-
-function logEvent(type, extra = {}) {
-  S.events.push({ type, block: S.block, practice: S.isPractice, t_ms: round(now() - S.t0, 1), ...extra });
-}
-
-function endPractice() {
-  S.phase = 'idle';
+function introTest() {
+  const t = S.order[S.testIdx];
+  setupUI(t, 'practice');
   showOverlay({
-    html: `<h2>Practice complete</h2>
-           <p>Now the real test begins: ${CONFIG.N_BLOCKS} parts with a short break in between.</p>
-           <p class="muted">Keep your eyes on the moving circle and respond as fast as you can.</p>`,
-    buttonText: 'Start the test',
-    onClick: () => { S.isPractice = false; S.block = 1; beginBlock(); }
+    html: `<h2>Test ${S.testIdx + 1} of 3: ${TEST_INFO[t].name}</h2>${TEST_INFO[t].text(S.t3Variant)}`,
+    buttonText: `Start try-out (${CONFIG.PRACTICE_S} s)`,
+    onClick: () => runSegment(t, 'practice', CONFIG.PRACTICE_S, () => {
+      showOverlay({
+        html: `<h2>Try-out done</h2><p>Now the real test (${CONFIG.TEST_S} seconds). Same task – respond as fast as you can.</p>`,
+        buttonText: 'Start test',
+        onClick: () => runSegment(t, 'main', CONFIG.TEST_S, afterTest)
+      });
+    })
   });
 }
 
-function endBlock() {
-  S.phase = 'idle';
-  logEvent('block_end');
-  if (S.block < CONFIG.N_BLOCKS) {
+function afterTest() {
+  if (S.testIdx < S.order.length - 1) {
     logEvent('rest_start');
     showOverlay({
-      html: `<h2>Break</h2><p>Part ${S.block} of ${CONFIG.N_BLOCKS} done. Relax your hands and eyes.</p>`,
-      buttonText: 'Continue',
-      countdown: CONFIG.REST_DURATION_S,
-      onClick: () => { logEvent('rest_end'); S.block++; beginBlock(); }
+      html: `<h2>Break</h2><p>Test ${S.testIdx + 1} of 3 done. Relax your hands and eyes.</p>`,
+      buttonText: 'Next test',
+      countdown: CONFIG.REST_S,
+      onClick: () => { logEvent('rest_end'); S.testIdx++; introTest(); }
     });
   } else {
     finishSession();
   }
 }
 
-/* ---------- Pause when the app is hidden (call, notification, tab switch) ---------- */
+function setupUI(t, mode) {
+  $('hudTest').textContent = `Test ${S.testIdx + 1} of 3 · ${TEST_INFO[t].name}`;
+  $('hudMode').textContent = mode === 'practice' ? 'Try-out' : '';
+  $('divider').style.display = t === 't1' ? 'block' : 'none';
+  $('ball').style.display = (t === 't1' || t === 't3') ? 'block' : 'none';
+  $('ball').style.background = 'var(--ball)';
+  $('ctl-lr').classList.toggle('show', t === 't1');
+  $('ctl-press').classList.toggle('show', t === 't3');
+  $('controls').style.display = t === 't2' ? 'none' : 'block';
+  hideStim();
+  requestAnimationFrame(resizeArena);
+}
+
+function runSegment(t, mode, durS, onDone) {
+  S.test = t; S.mode = mode; S.segDur = durS; S.onDone = onDone;
+  S.trialNo = 0; S.endsAt = 0; S.phase = 'idle'; S.segActive = true; S.lastColour = null;
+  setupUI(t, mode);
+  logEvent('segment_start');
+  flash('Get ready…', 1200);
+  S.readyTimer = setTimeout(() => { S.endsAt = now() + durS * 1000; scheduleNext(); }, 1200);
+}
+
+function endSegment() {
+  if (!S.segActive) return;
+  S.segActive = false;
+  clearTimeout(S.isiTimer); clearTimeout(S.timeoutTimer); clearTimeout(S.readyTimer);
+  hideStim(); S.phase = 'idle';
+  logEvent('segment_end');
+  const cb = S.onDone; S.onDone = null; cb && cb();
+}
+
+function scheduleNext() {
+  if (!S.running || S.paused || !S.segActive) return;
+  if (now() >= S.endsAt) return endSegment();
+  const cfg = CONFIG.TESTS[S.test];
+  S.isi = rand(cfg.ISI_MIN, cfg.ISI_MAX);
+  S.phase = 'waiting';
+  S.isiTimer = setTimeout(present, S.isi);
+}
+
+function present() {
+  requestAnimationFrame(() => {
+    if (!S.running || S.paused || !S.segActive) return;
+    if (now() >= S.endsAt) return endSegment();
+    const t = S.test, A = arenaBox;
+
+    if (t === 't1') {
+      const side = Math.random() < 0.5 ? 'left' : 'right';
+      const top = rand(A.h * 0.2, A.h * 0.8);
+      const el = $('rect-' + side);
+      el.style.top = top + 'px'; el.classList.add('show');
+      S.stim = { side, y: top };
+    } else if (t === 't2') {
+      const nogo = Math.random() < CONFIG.TESTS.t2.NOGO_PROB;
+      const x = rand(40, Math.max(41, A.w - 40)), y = rand(40, Math.max(41, A.h - 70));
+      const el = $('pop');
+      el.style.left = x + 'px'; el.style.top = y + 'px';
+      el.style.background = nogo ? 'var(--nogo)' : 'var(--go)';
+      el.classList.add('show');
+      S.stim = { x, y, nogo, colour: nogo ? 'red' : 'blue' };
+    } else {
+      let colour = CONFIG.T3_GREEN;
+      if (S.t3Variant === 'multicolour') {
+        const options = CONFIG.T3_COLOURS.filter(c => c !== S.lastColour);
+        colour = pick(options);
+      }
+      S.lastColour = colour;
+      $('ball').style.background = colour;
+      S.stim = { colour, x: round(S.ball.x, 0), y: round(S.ball.y, 0) };
+    }
+
+    S.onset = now();
+    S.phase = 'stim';
+    S.timeoutTimer = setTimeout(onTimeout, CONFIG.TESTS[t].TIMEOUT);
+  });
+}
+
+function hideStim() {
+  document.querySelectorAll('.rect').forEach(r => r.classList.remove('show'));
+  $('pop').classList.remove('show');
+  $('ball').style.background = 'var(--ball)';
+}
+
+function onTimeout() {
+  if (S.phase !== 'stim') return;
+  const outcome = (S.test === 't2' && S.stim.nogo) ? 'correct_rejection' : 'miss';
+  hideStim(); S.phase = 'idle';
+  recordTrial(null, null, outcome);
+  feedback(outcome);
+  scheduleNext();
+}
+
+function respond(input, t, source, pos) {
+  if (!S.running || S.paused || !S.segActive) return;
+  const T = S.test;
+  if ((T === 't1' && input !== 'left' && input !== 'right') ||
+      (T === 't2' && input !== 'tap') || (T === 't3' && input !== 'press')) return;
+  S.inputs.add(source);
+  if (t < S.ignoreUntil) return;
+  S.ignoreUntil = t + CONFIG.DEBOUNCE_MS;
+
+  if (S.phase === 'waiting') {           // responded before anything appeared
+    clearTimeout(S.isiTimer);
+    logEvent('false_start', { response: input });
+    S.phase = 'idle';
+    flash('Too early – wait for it');
+    setTimeout(scheduleNext, 1000);
+    return;
+  }
+  if (S.phase !== 'stim') return;
+
+  const rt = t - S.onset;
+  let outcome;
+  if (T === 't1') {
+    outcome = rt < CONFIG.ANTICIPATION_MS ? 'anticipation' : (input === S.stim.side ? 'hit' : 'wrong_direction');
+  } else if (T === 't2') {
+    const r = 28 * CONFIG.TAP_TOLERANCE;
+    const onBall = Math.hypot(pos.x - S.stim.x, pos.y - S.stim.y) <= r;
+    if (!onBall) {                       // tapped somewhere else: logged, ball stays
+      logEvent('off_target_tap', { x: round(pos.x, 0), y: round(pos.y, 0) });
+      if (S.mode === 'practice') flash('Tap on the ball');
+      return;
+    }
+    outcome = S.stim.nogo ? 'commission_error' : (rt < CONFIG.ANTICIPATION_MS ? 'anticipation' : 'hit');
+  } else {
+    outcome = rt < CONFIG.ANTICIPATION_MS ? 'anticipation' : 'hit';
+  }
+
+  clearTimeout(S.timeoutTimer);
+  hideStim(); S.phase = 'idle';
+  recordTrial(input, rt, outcome);
+  feedback(outcome);
+  setTimeout(scheduleNext, 300);
+}
+
+function feedback(outcome) {
+  if (S.mode === 'practice') {
+    const msg = { hit: 'Good', wrong_direction: 'Wrong side', commission_error: "Don't tap red balls",
+                  anticipation: 'Too early', miss: 'Missed – be faster', correct_rejection: 'Good – red ignored' }[outcome];
+    if (msg) flash(msg);
+  } else if (outcome === 'anticipation') {
+    flash('Too early – wait for it');
+  }
+}
+
+function recordTrial(response, rt, outcome) {
+  S.trialNo++;
+  S.trials.push({
+    test: S.test,
+    test3_version: S.test === 't3' ? S.t3Variant : '',
+    mode: S.mode,
+    trial: S.trialNo,
+    stim_side: S.stim.side ?? '',
+    stim_colour: S.stim.colour ?? '',
+    stim_x: S.stim.x ?? '',
+    stim_y: S.stim.y ?? '',
+    nogo: S.stim.nogo ?? '',
+    response,
+    rt_ms: round(rt, 1),
+    outcome,
+    lapse: outcome === 'miss' || (outcome === 'hit' && rt > CONFIG.LAPSE_THRESHOLD_MS),
+    isi_ms: S.isi,
+    onset_ms: round(S.onset - S.t0, 1)
+  });
+}
+
+function logEvent(type, extra = {}) {
+  S.events.push({ type, test: S.test, mode: S.mode, t_ms: round(now() - S.t0, 1), ...extra });
+}
+
+/* ---------- Pause when the app goes to the background (call, notification, tab switch) ---------- */
 document.addEventListener('visibilitychange', () => {
-  if (!S.running) return;
+  if (!S.running || !S.segActive) return;
   if (document.hidden && !S.paused) {
     S.paused = true;
-    clearTimeout(S.isiTimer); clearTimeout(S.timeoutTimer);
-    if (S.phase === 'cue') { hideCues(); logEvent('trial_aborted_hidden', { cue_dir: S.cueDir }); }
+    clearTimeout(S.isiTimer); clearTimeout(S.timeoutTimer); clearTimeout(S.readyTimer);
+    if (S.phase === 'stim') { hideStim(); logEvent('trial_aborted_hidden'); }
     S.phase = 'idle';
-    S.blockRemaining = S.blockEndsAt - now();
+    S.remaining = S.endsAt ? S.endsAt - now() : null;
     logEvent('interruption');
   } else if (!document.hidden && S.paused) {
     showOverlay({
@@ -531,10 +650,14 @@ document.addEventListener('visibilitychange', () => {
       buttonText: 'Continue',
       onClick: () => {
         S.paused = false;
-        if (!S.isPractice) S.blockEndsAt = now() + Math.max(0, S.blockRemaining);
         logEvent('resume');
         try { navigator.wakeLock?.request('screen').then(l => S.wakeLock = l); } catch (e) {}
-        scheduleNext();
+        if (S.remaining == null) {
+          S.readyTimer = setTimeout(() => { S.endsAt = now() + S.segDur * 1000; scheduleNext(); }, 1200);
+        } else {
+          S.endsAt = now() + Math.max(0, S.remaining);
+          scheduleNext();
+        }
       }
     });
   }
@@ -543,41 +666,45 @@ document.addEventListener('visibilitychange', () => {
 /* =====================================================================
    INPUT
    ===================================================================== */
-document.querySelectorAll('.dir-btn').forEach(btn => {
+document.querySelectorAll('.resp-btn').forEach(btn => {
   btn.addEventListener('pointerdown', e => {
     e.preventDefault();
-    const t = e.timeStamp > 0 ? e.timeStamp : now();
-    respond(btn.dataset.dir, t, e.pointerType || 'pointer');
+    respond(btn.dataset.input, e.timeStamp > 0 ? e.timeStamp : now(), e.pointerType || 'pointer');
   });
 });
-document.addEventListener('keydown', e => {
-  const dir = KEY_MAP[e.key];
-  if (!dir || e.repeat) return;
+$('arena').addEventListener('pointerdown', e => {
+  if (S.test !== 't2') return;
   e.preventDefault();
-  respond(dir, e.timeStamp > 0 ? e.timeStamp : now(), 'keyboard');
+  const r = $('arena').getBoundingClientRect();
+  respond('tap', e.timeStamp > 0 ? e.timeStamp : now(), e.pointerType || 'pointer',
+          { x: e.clientX - r.left, y: e.clientY - r.top });
+});
+document.addEventListener('keydown', e => {
+  if (!S.running || e.repeat) return;
+  const map = { ArrowLeft: 'left', ArrowRight: 'right', ' ': 'press', Enter: 'press' };
+  const input = map[e.key];
+  if (!input) return;
+  e.preventDefault();
+  respond(input, e.timeStamp > 0 ? e.timeStamp : now(), 'keyboard');
 });
 document.addEventListener('contextmenu', e => { if (S.running) e.preventDefault(); });
 
 /* =====================================================================
-   MOVING TARGET
+   MOVING BALL (tests 1 and 3)
    ===================================================================== */
 const arenaBox = { w: 0, h: 0 };
-function resizeArena() {
-  const r = $('arena').getBoundingClientRect();
-  arenaBox.w = r.width; arenaBox.h = r.height;
-}
+function resizeArena() { const r = $('arena').getBoundingClientRect(); arenaBox.w = r.width; arenaBox.h = r.height; }
 window.addEventListener('resize', resizeArena);
 
 function startAnimation() {
-  const target = $('target');
+  const ball = $('ball');
   const step = ts => {
-    const t = (ts / 1000) * CONFIG.TARGET_SPEED;
-    const ax = Math.max(0, arenaBox.w / 2 - CONFIG.TARGET_MARGIN_PX);
-    const ay = Math.max(0, arenaBox.h / 2 - CONFIG.TARGET_MARGIN_PX);
-    // smooth, non-repeating-looking path (Lissajous curve)
-    const x = arenaBox.w / 2 + ax * Math.sin(t * 1.3) * Math.cos(t * 0.37);
-    const y = arenaBox.h / 2 + ay * Math.sin(t * 0.9 + 1.1);
-    target.style.transform = `translate(${x}px, ${y}px)`;
+    const t = (ts / 1000) * CONFIG.BALL_SPEED;
+    const ax = Math.max(0, arenaBox.w / 2 - 95);   // stays clear of the side rectangles
+    const ay = Math.max(0, arenaBox.h / 2 - 60);
+    S.ball.x = arenaBox.w / 2 + ax * Math.sin(t * 1.3) * Math.cos(t * 0.37);
+    S.ball.y = arenaBox.h / 2 + ay * Math.sin(t * 0.9 + 1.1);
+    ball.style.transform = `translate(${S.ball.x}px, ${S.ball.y}px)`;
     S.animId = requestAnimationFrame(step);
   };
   cancelAnimationFrame(S.animId);
@@ -587,44 +714,39 @@ function startAnimation() {
 /* =====================================================================
    RESULTS
    ===================================================================== */
+const OUTCOMES = ['hit', 'miss', 'wrong_direction', 'anticipation', 'commission_error', 'correct_rejection'];
 function summarize(trials, events) {
-  const hits = trials.filter(t => t.outcome === 'hit');
-  const rts = hits.map(t => t.rt_ms);
-  return {
-    n_trials: trials.length,
-    hits: hits.length,
-    wrong_direction: trials.filter(t => t.outcome === 'wrong_direction').length,
-    misses: trials.filter(t => t.outcome === 'miss').length,
-    anticipations: trials.filter(t => t.outcome === 'anticipation').length,
-    false_starts: events.filter(e => e.type === 'false_start').length,
-    lapses: trials.filter(t => t.lapse).length,
-    median_rt_ms: round(median(rts)),
-    mean_rt_ms: round(mean(rts)),
-    sd_rt_ms: round(sd(rts)),
-    mean_speed_per_s: round(mean(rts.map(r => 1000 / r)), 3)
-  };
+  const rts = trials.filter(t => t.outcome === 'hit').map(t => t.rt_ms);
+  const s = { n_trials: trials.length };
+  OUTCOMES.forEach(o => s[o === 'miss' ? 'misses' : o + 's'] = trials.filter(t => t.outcome === o).length);
+  s.false_starts = events.filter(e => e.type === 'false_start').length;
+  s.off_target_taps = events.filter(e => e.type === 'off_target_tap').length;
+  s.lapses = trials.filter(t => t.lapse).length;
+  s.median_rt_ms = round(median(rts));
+  s.mean_rt_ms = round(mean(rts));
+  s.sd_rt_ms = round(sd(rts));
+  s.mean_speed_per_s = round(mean(rts.map(r => 1000 / r)), 3);
+  return s;
 }
 
 function buildPayload() {
-  const main = S.trials.filter(t => !t.practice);
-  const mainEvents = S.events.filter(e => !e.practice);
-  const payload = { ...S.meta };
-
-  payload.input_methods = [...S.inputs].join(', ');
-  payload.interruptions = S.events.filter(e => e.type === 'interruption').length;
-  payload.config = `blocks=${CONFIG.N_BLOCKS}, block_s=${CONFIG.BLOCK_DURATION_S}, rest_s=${CONFIG.REST_DURATION_S}, isi=${CONFIG.ISI_MIN_MS}-${CONFIG.ISI_MAX_MS}, timeout=${CONFIG.RESPONSE_TIMEOUT_MS}, lapse>${CONFIG.LAPSE_THRESHOLD_MS}`;
-
-  Object.entries(summarize(main, mainEvents)).forEach(([k, v]) => payload['all_' + k] = v);
-  for (let b = 1; b <= CONFIG.N_BLOCKS; b++) {
-    const s = summarize(main.filter(t => t.block === b), mainEvents.filter(e => e.block === b));
-    Object.entries(s).forEach(([k, v]) => payload[`b${b}_${k}`] = v);
-  }
-
-  payload.trials_json = JSON.stringify(S.trials);
-  payload.events_json = JSON.stringify(S.events);
-  payload.app_version = CONFIG.APP_VERSION;
-  payload._subject = `RT ${S.meta.participant_code} – ${S.meta.time_slot} – ${S.meta.session_type}`;
-  return payload;
+  const p = { ...S.meta };
+  p.test_order = S.order.join(', ');
+  p.test3_version = S.t3Variant;
+  p.input_methods = [...S.inputs].join(', ');
+  p.interruptions = S.events.filter(e => e.type === 'interruption').length;
+  p.config = `practice_s=${CONFIG.PRACTICE_S}, test_s=${CONFIG.TEST_S}, rest_s=${CONFIG.REST_S}, lapse>${CONFIG.LAPSE_THRESHOLD_MS}, ` +
+             Object.entries(CONFIG.TESTS).map(([k, v]) => `${k}:isi=${v.ISI_MIN}-${v.ISI_MAX},timeout=${v.TIMEOUT}`).join('; ');
+  ['t1', 't2', 't3'].forEach(t => {
+    const s = summarize(S.trials.filter(x => x.test === t && x.mode === 'main'),
+                        S.events.filter(e => e.test === t && e.mode === 'main'));
+    Object.entries(s).forEach(([k, v]) => p[`${t}_${k}`] = v);
+  });
+  p.trials_json = JSON.stringify(S.trials);
+  p.events_json = JSON.stringify(S.events);
+  p.app_version = CONFIG.APP_VERSION;
+  p._subject = `RT ${S.meta.participant_number} – ${S.meta.time_of_day || 'time n/a'} – ${S.meta.started_at_iso.slice(0, 16)}`;
+  return p;
 }
 
 async function finishSession() {
@@ -633,7 +755,7 @@ async function finishSession() {
   try { await S.wakeLock?.release(); } catch (e) {}
   try { if (document.fullscreenElement) await document.exitFullscreen(); } catch (e) {}
 
-  const code = S.meta.participant_code;
+  const code = S.meta.participant_number;
   store('rt_last_' + code, new Date().toISOString());
   const ck = `rt_count_${code}_${todayKey()}`;
   store(ck, load(ck, 0) + 1);
@@ -649,22 +771,15 @@ function renderResults() {
   const box = $('resultsBox');
   if (!CONFIG.SHOW_RESULTS_TO_PARTICIPANT) { box.hidden = true; return; }
   const p = S.payload;
-  let rows = '';
-  for (let b = 1; b <= CONFIG.N_BLOCKS; b++) {
-    rows += `<tr><td>Part ${b}</td><td>${p[`b${b}_median_rt_ms`] ?? '–'}</td><td>${p[`b${b}_lapses`]}</td><td>${p[`b${b}_false_starts`]}</td></tr>`;
-  }
-  box.innerHTML = `<table><tr><th></th><th>Median (ms)</th><th>Lapses</th><th>Early</th></tr>${rows}</table>`;
+  const rows = ['t1', 't2', 't3'].map(t =>
+    `<tr><td>${TEST_INFO[t].name}</td><td>${p[t + '_median_rt_ms'] ?? '–'}</td><td>${p[t + '_misses']}</td></tr>`).join('');
+  box.innerHTML = `<table><tr><th>Test</th><th>Median (ms)</th><th>Missed</th></tr>${rows}</table>`;
   box.hidden = false;
 }
 
 /* ---------- Sending (Formspree) with offline queue ---------- */
-function queuePending(p) {
-  const q = load('rt_pending', []);
-  if (!q.some(x => x.session_id === p.session_id)) { q.push(p); store('rt_pending', q); }
-}
-function removePending(id) {
-  store('rt_pending', load('rt_pending', []).filter(x => x.session_id !== id));
-}
+function queuePending(p) { const q = load('rt_pending', []); if (!q.some(x => x.session_id === p.session_id)) { q.push(p); store('rt_pending', q); } }
+function removePending(id) { store('rt_pending', load('rt_pending', []).filter(x => x.session_id !== id)); }
 async function sendPayload(p) {
   const res = await fetch(CONFIG.FORMSPREE_ENDPOINT, {
     method: 'POST',
@@ -686,32 +801,31 @@ async function sendCurrent() {
   }
 }
 async function flushPending() {
-  for (const p of load('rt_pending', [])) {
-    try { await sendPayload(p); } catch (e) { return; }
-  }
+  for (const p of load('rt_pending', [])) { try { await sendPayload(p); } catch (e) { return; } }
   const left = load('rt_pending', []).length;
   $('pendingNote').textContent = left ? `${left} earlier result(s) still waiting to be sent.` : 'Earlier results sent ✓';
 }
-
 $('btnRetry').addEventListener('click', sendCurrent);
 $('btnNewSession').addEventListener('click', () => location.reload());
 
 /* ---------- CSV download (backup) ---------- */
 $('btnDownload').addEventListener('click', () => {
   const m = S.meta;
-  const head = ['session_id','participant_code','session_type','time_slot','started_at_iso','block','practice','trial','cue_dir','response','rt_ms','outcome','lapse','isi_ms','onset_ms'];
-  const rows = S.trials.map(t => [m.session_id, m.participant_code, m.session_type, m.time_slot, m.started_at_iso,
-    t.block, t.practice, t.trial, t.cue_dir, t.response ?? '', t.rt_ms ?? '', t.outcome, t.lapse, t.isi_ms, t.onset_ms]);
-  S.events.filter(e => e.type === 'false_start').forEach(e => rows.push([m.session_id, m.participant_code, m.session_type, m.time_slot, m.started_at_iso,
-    e.block, e.practice, '', '', e.response ?? '', '', 'false_start', '', '', e.t_ms]));
+  const head = ['session_id','participant_number','started_at_iso','time_of_day','test','test3_version','mode','trial',
+                'stim_side','stim_colour','stim_x','stim_y','nogo','response','rt_ms','outcome','lapse','isi_ms','onset_ms'];
+  const base = [m.session_id, m.participant_number, m.started_at_iso, m.time_of_day];
+  const rows = S.trials.map(t => [...base, t.test, t.test3_version, t.mode, t.trial, t.stim_side, t.stim_colour,
+    t.stim_x, t.stim_y, t.nogo, t.response ?? '', t.rt_ms ?? '', t.outcome, t.lapse, t.isi_ms, t.onset_ms]);
+  S.events.filter(e => e.type === 'false_start' || e.type === 'off_target_tap').forEach(e =>
+    rows.push([...base, e.test, '', e.mode, '', '', '', e.x ?? '', e.y ?? '', '', e.response ?? '', '', e.type, '', '', e.t_ms]));
   const csv = [head, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
-  a.download = `rt_${m.participant_code}_${m.started_at_iso.slice(0, 16).replace(/[:T]/g, '-')}.csv`;
+  a.download = `rt_${m.participant_number}_${m.started_at_iso.slice(0, 16).replace(/[:T]/g, '-')}.csv`;
   a.click();
 });
 
-initSetup();
+initQuestions();
 </script>
 </body>
 </html>
