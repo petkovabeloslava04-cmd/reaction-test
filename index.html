@@ -102,13 +102,13 @@
 <section id="screen-q" class="screen active">
   <h1>Reaction Time Study</h1>
   <div class="card">
-    <p>A few short questions before the test begins.</p>
+    <p>Before the test, a few short questions about how you are right now.</p>
     <p><strong>All questions are optional.</strong> You can leave out any question you don't want to answer,
        or skip the whole section with the button at the bottom. Tap a selected answer again to remove it.</p>
   </div>
 
   <div class="field">
-    <label class="title" for="code">Please fill out yout participant number</label>
+    <label class="title" for="code">Participant number</label>
     <input type="text" id="code" autocomplete="off" autocapitalize="characters" placeholder="e.g. P01">
     <p class="muted">Needed to link your sessions together. No names are collected.</p>
   </div>
@@ -147,7 +147,7 @@
     </fieldset>
 
     <fieldset>
-      <legend>How are your energy levels coming into this session?</legend>
+      <legend>How tired do you feel right now?</legend>
       <div class="chips scale" id="tiredScale"></div>
       <p class="muted" style="margin-top:6px">1 = not tired at all · 10 = extremely tired</p>
     </fieldset>
@@ -162,20 +162,20 @@
 
 <!-- ================= 2. GENERAL INSTRUCTIONS ================= -->
 <section id="screen-instructions" class="screen">
-  <h1>How the session works</h1>
+  <h1 id="instrTitle">Today's test</h1>
+  <div class="card" id="instrTest"></div>
   <div class="card">
-    <ol>
-      <li>There are <strong>3 short tests</strong>, about <strong id="instrMinutes">5</strong> minutes in total.</li>
-      <li>Before each test you'll see what to do and get a <strong>short try-out</strong>.</li>
-      <li>Respond <strong>as fast as you can</strong>, but don't press before something appears.</li>
-      <li>There is a short break between the tests.</li>
-    </ol>
+    <p><strong>First, a <span id="instrPracticeS">30</span>-second try-out.</strong></p>
+    <p>Before the real test starts, you will practise the exercise for <span class="instrPracticeS2">30</span> seconds
+       so you can get used to it. The try-out does not count.</p>
+    <p>After the try-out, the real test begins: <strong id="instrParts">3</strong> parts with a short break in between
+       (about <strong id="instrMinutes">5</strong> minutes in total).</p>
   </div>
   <div class="card muted">
     Before you start: sit as you normally do, use the same device and hand as in your other sessions,
     and turn on <em>Do Not Disturb</em> so notifications don't interrupt you. You can stop at any time.
   </div>
-  <button class="btn" id="btnStart">Start</button>
+  <button class="btn" id="btnStart">Start the try-out</button>
   <button class="btn secondary" id="btnBack">Back</button>
 </section>
 
@@ -219,14 +219,17 @@
    CONFIGURATION – change these values to adapt the study
    ===================================================================== */
 const CONFIG = {
-  FORMSPREE_ENDPOINT: 'https://formspree.io/f/xnpjzreo', // <- paste your Formspree form URL
+  FORMSPREE_ENDPOINT: 'https://formspree.io/f/YOUR_FORM_ID', // <- paste your Formspree form URL
   APP_VERSION: '2.0',
 
-  // Session structure (3 tests)
-  PRACTICE_S: 10,         // try-out before each test, in seconds (3 tests x 10 s = 30 s)
-  TEST_S: 75,             // length of each test, in seconds
-  REST_S: 15,             // break between tests, in seconds
-  RANDOMIZE_ORDER: false, // true = the 3 tests come in a random order each session
+  // Session structure: ONE test per session, chosen at random
+  TEST_POOL: ['t1', 't2', 't3'], // tests that can be assigned (remove one to stop using it)
+  ASSIGNMENT: 'balanced', // 'balanced' = random, but each test comes up equally often for each participant
+                          // 'random'   = pure random each session (the same test may repeat several times)
+  PRACTICE_S: 30,         // try-out before the test, in seconds (does not count)
+  N_BLOCKS: 3,            // the real test is split into this many parts
+  BLOCK_S: 80,            // length of each part, in seconds
+  REST_S: 10,             // break between parts, in seconds
 
   // Timing per test (milliseconds)
   TESTS: {
@@ -284,7 +287,7 @@ const TEST_INFO = {
 const $ = id => document.getElementById(id);
 const S = {
   meta: null, trials: [], events: [], inputs: new Set(),
-  order: [], testIdx: 0, t3Variant: 'green',
+  block: 0, bagAfter: null, t3Variant: 'green',
   running: false, paused: false, segActive: false,
   test: null, mode: null, segDur: 0, endsAt: 0, remaining: 0, onDone: null,
   phase: 'idle',            // 'idle' | 'waiting' | 'stim'
@@ -351,8 +354,11 @@ function initQuestions() {
   updateGapWarning();
   $('code').addEventListener('input', updateGapWarning);
 
-  const totalS = 3 * CONFIG.PRACTICE_S + 3 * CONFIG.TEST_S + 2 * CONFIG.REST_S;
+  const totalS = CONFIG.PRACTICE_S + CONFIG.N_BLOCKS * CONFIG.BLOCK_S + (CONFIG.N_BLOCKS - 1) * CONFIG.REST_S;
   $('instrMinutes').textContent = Math.round(totalS / 60);
+  $('instrParts').textContent = CONFIG.N_BLOCKS;
+  $('instrPracticeS').textContent = CONFIG.PRACTICE_S;
+  document.querySelectorAll('.instrPracticeS2').forEach(e => e.textContent = CONFIG.PRACTICE_S);
 
   const pending = load('rt_pending', []);
   if (pending.length) {
@@ -406,6 +412,19 @@ function submitQuestions(skipped) {
     auto_screen: `${screen.width}x${screen.height} @${window.devicePixelRatio}x`,
     auto_touch: IS_TOUCH
   };
+
+  // choose today's test
+  if (CONFIG.ASSIGNMENT === 'random') {
+    S.test = pick(CONFIG.TEST_POOL); S.bagAfter = null;
+  } else {
+    let bag = load('rt_bag_' + code, []).filter(t => CONFIG.TEST_POOL.includes(t));
+    if (!bag.length) bag = shuffle(CONFIG.TEST_POOL);
+    S.test = bag[0]; S.bagAfter = bag.slice(1);   // saved only when the session is completed
+  }
+  S.t3Variant = Math.random() < 0.5 ? 'green' : 'multicolour';
+
+  $('instrTitle').textContent = `Today's test: ${TEST_INFO[S.test].name}`;
+  $('instrTest').innerHTML = TEST_INFO[S.test].text(S.t3Variant);
   showScreen('screen-instructions');
 }
 
@@ -418,10 +437,7 @@ $('btnStart').addEventListener('click', () => startSession());
    SESSION FLOW
    ===================================================================== */
 async function startSession() {
-  S.trials = []; S.events = []; S.inputs = new Set();
-  S.order = CONFIG.RANDOMIZE_ORDER ? shuffle(['t1', 't2', 't3']) : ['t1', 't2', 't3'];
-  S.t3Variant = Math.random() < 0.5 ? 'green' : 'multicolour';
-  S.testIdx = 0;
+  S.trials = []; S.events = []; S.inputs = new Set(); S.block = 0;
   showScreen('screen-test');
 
   try { await document.documentElement.requestFullscreen?.(); } catch (e) {}
@@ -431,42 +447,37 @@ async function startSession() {
   S.t0 = now();
   S.running = true;
   startAnimation();
-  introTest();
-}
-
-function introTest() {
-  const t = S.order[S.testIdx];
-  setupUI(t, 'practice');
-  showOverlay({
-    html: `<h2>Test ${S.testIdx + 1} of 3: ${TEST_INFO[t].name}</h2>${TEST_INFO[t].text(S.t3Variant)}`,
-    buttonText: `Start try-out (${CONFIG.PRACTICE_S} s)`,
-    onClick: () => runSegment(t, 'practice', CONFIG.PRACTICE_S, () => {
-      showOverlay({
-        html: `<h2>Try-out done</h2><p>Now the real test (${CONFIG.TEST_S} seconds). Same task – respond as fast as you can.</p>`,
-        buttonText: 'Start test',
-        onClick: () => runSegment(t, 'main', CONFIG.TEST_S, afterTest)
-      });
-    })
+  runSegment(S.test, 'practice', CONFIG.PRACTICE_S, () => {
+    showOverlay({
+      html: `<h2>Try-out complete</h2>
+             <p>Now the real test begins. It has ${CONFIG.N_BLOCKS} parts with a short break in between.</p>
+             <p>Same task as in the try-out – respond as fast as you can.</p>
+             <div class="card" style="text-align:left">${TEST_INFO[S.test].text(S.t3Variant)}</div>`,
+      buttonText: 'Start the test',
+      onClick: () => { S.block = 1; runBlock(); }
+    });
   });
 }
 
-function afterTest() {
-  if (S.testIdx < S.order.length - 1) {
-    logEvent('rest_start');
-    showOverlay({
-      html: `<h2>Break</h2><p>Test ${S.testIdx + 1} of 3 done. Relax your hands and eyes.</p>`,
-      buttonText: 'Next test',
-      countdown: CONFIG.REST_S,
-      onClick: () => { logEvent('rest_end'); S.testIdx++; introTest(); }
-    });
-  } else {
-    finishSession();
-  }
+function runBlock() {
+  runSegment(S.test, 'main', CONFIG.BLOCK_S, () => {
+    if (S.block < CONFIG.N_BLOCKS) {
+      logEvent('rest_start');
+      showOverlay({
+        html: `<h2>Break</h2><p>Part ${S.block} of ${CONFIG.N_BLOCKS} done. Relax your hands and eyes.</p>`,
+        buttonText: 'Continue',
+        countdown: CONFIG.REST_S,
+        onClick: () => { logEvent('rest_end'); S.block++; runBlock(); }
+      });
+    } else {
+      finishSession();
+    }
+  });
 }
 
 function setupUI(t, mode) {
-  $('hudTest').textContent = `Test ${S.testIdx + 1} of 3 · ${TEST_INFO[t].name}`;
-  $('hudMode').textContent = mode === 'practice' ? 'Try-out' : '';
+  $('hudTest').textContent = TEST_INFO[t].name;
+  $('hudMode').textContent = mode === 'practice' ? 'Try-out' : `Part ${S.block} of ${CONFIG.N_BLOCKS}`;
   $('divider').style.display = t === 't1' ? 'block' : 'none';
   $('ball').style.display = (t === 't1' || t === 't3') ? 'block' : 'none';
   $('ball').style.background = 'var(--ball)';
@@ -615,6 +626,7 @@ function recordTrial(response, rt, outcome) {
     test: S.test,
     test3_version: S.test === 't3' ? S.t3Variant : '',
     mode: S.mode,
+    block: S.mode === 'practice' ? 0 : S.block,
     trial: S.trialNo,
     stim_side: S.stim.side ?? '',
     stim_colour: S.stim.colour ?? '',
@@ -631,7 +643,7 @@ function recordTrial(response, rt, outcome) {
 }
 
 function logEvent(type, extra = {}) {
-  S.events.push({ type, test: S.test, mode: S.mode, t_ms: round(now() - S.t0, 1), ...extra });
+  S.events.push({ type, test: S.test, mode: S.mode, block: S.mode === 'practice' ? 0 : S.block, t_ms: round(now() - S.t0, 1), ...extra });
 }
 
 /* ---------- Pause when the app goes to the background (call, notification, tab switch) ---------- */
@@ -731,21 +743,24 @@ function summarize(trials, events) {
 
 function buildPayload() {
   const p = { ...S.meta };
-  p.test_order = S.order.join(', ');
-  p.test3_version = S.t3Variant;
+  p.test = S.test;
+  p.test_name = TEST_INFO[S.test].name;
+  p.test3_version = S.test === 't3' ? S.t3Variant : '';
   p.input_methods = [...S.inputs].join(', ');
   p.interruptions = S.events.filter(e => e.type === 'interruption').length;
-  p.config = `practice_s=${CONFIG.PRACTICE_S}, test_s=${CONFIG.TEST_S}, rest_s=${CONFIG.REST_S}, lapse>${CONFIG.LAPSE_THRESHOLD_MS}, ` +
-             Object.entries(CONFIG.TESTS).map(([k, v]) => `${k}:isi=${v.ISI_MIN}-${v.ISI_MAX},timeout=${v.TIMEOUT}`).join('; ');
-  ['t1', 't2', 't3'].forEach(t => {
-    const s = summarize(S.trials.filter(x => x.test === t && x.mode === 'main'),
-                        S.events.filter(e => e.test === t && e.mode === 'main'));
-    Object.entries(s).forEach(([k, v]) => p[`${t}_${k}`] = v);
-  });
+  const c = CONFIG.TESTS[S.test];
+  p.config = `assignment=${CONFIG.ASSIGNMENT}, practice_s=${CONFIG.PRACTICE_S}, blocks=${CONFIG.N_BLOCKS}, block_s=${CONFIG.BLOCK_S}, ` +
+             `rest_s=${CONFIG.REST_S}, isi=${c.ISI_MIN}-${c.ISI_MAX}, timeout=${c.TIMEOUT}, lapse>${CONFIG.LAPSE_THRESHOLD_MS}`;
+  const main = S.trials.filter(x => x.mode === 'main'), mainEv = S.events.filter(e => e.mode === 'main');
+  Object.entries(summarize(main, mainEv)).forEach(([k, v]) => p['all_' + k] = v);
+  for (let b = 1; b <= CONFIG.N_BLOCKS; b++) {
+    const s = summarize(main.filter(x => x.block === b), mainEv.filter(e => e.block === b));
+    Object.entries(s).forEach(([k, v]) => p[`b${b}_${k}`] = v);
+  }
   p.trials_json = JSON.stringify(S.trials);
   p.events_json = JSON.stringify(S.events);
   p.app_version = CONFIG.APP_VERSION;
-  p._subject = `RT ${S.meta.participant_number} – ${S.meta.time_of_day || 'time n/a'} – ${S.meta.started_at_iso.slice(0, 16)}`;
+  p._subject = `RT ${S.meta.participant_number} – ${p.test_name} – ${S.meta.time_of_day || 'time n/a'} – ${S.meta.started_at_iso.slice(0, 16)}`;
   return p;
 }
 
@@ -759,6 +774,7 @@ async function finishSession() {
   store('rt_last_' + code, new Date().toISOString());
   const ck = `rt_count_${code}_${todayKey()}`;
   store(ck, load(ck, 0) + 1);
+  if (S.bagAfter) store('rt_bag_' + code, S.bagAfter);
 
   S.payload = buildPayload();
   queuePending(S.payload);
@@ -771,9 +787,10 @@ function renderResults() {
   const box = $('resultsBox');
   if (!CONFIG.SHOW_RESULTS_TO_PARTICIPANT) { box.hidden = true; return; }
   const p = S.payload;
-  const rows = ['t1', 't2', 't3'].map(t =>
-    `<tr><td>${TEST_INFO[t].name}</td><td>${p[t + '_median_rt_ms'] ?? '–'}</td><td>${p[t + '_misses']}</td></tr>`).join('');
-  box.innerHTML = `<table><tr><th>Test</th><th>Median (ms)</th><th>Missed</th></tr>${rows}</table>`;
+  let rows = '';
+  for (let b = 1; b <= CONFIG.N_BLOCKS; b++)
+    rows += `<tr><td>Part ${b}</td><td>${p[`b${b}_median_rt_ms`] ?? '–'}</td><td>${p[`b${b}_misses`]}</td></tr>`;
+  box.innerHTML = `<table><tr><th>${p.test_name}</th><th>Median (ms)</th><th>Missed</th></tr>${rows}</table>`;
   box.hidden = false;
 }
 
@@ -811,13 +828,13 @@ $('btnNewSession').addEventListener('click', () => location.reload());
 /* ---------- CSV download (backup) ---------- */
 $('btnDownload').addEventListener('click', () => {
   const m = S.meta;
-  const head = ['session_id','participant_number','started_at_iso','time_of_day','test','test3_version','mode','trial',
+  const head = ['session_id','participant_number','started_at_iso','time_of_day','test','test3_version','mode','block','trial',
                 'stim_side','stim_colour','stim_x','stim_y','nogo','response','rt_ms','outcome','lapse','isi_ms','onset_ms'];
   const base = [m.session_id, m.participant_number, m.started_at_iso, m.time_of_day];
-  const rows = S.trials.map(t => [...base, t.test, t.test3_version, t.mode, t.trial, t.stim_side, t.stim_colour,
+  const rows = S.trials.map(t => [...base, t.test, t.test3_version, t.mode, t.block, t.trial, t.stim_side, t.stim_colour,
     t.stim_x, t.stim_y, t.nogo, t.response ?? '', t.rt_ms ?? '', t.outcome, t.lapse, t.isi_ms, t.onset_ms]);
   S.events.filter(e => e.type === 'false_start' || e.type === 'off_target_tap').forEach(e =>
-    rows.push([...base, e.test, '', e.mode, '', '', '', e.x ?? '', e.y ?? '', '', e.response ?? '', '', e.type, '', '', e.t_ms]));
+    rows.push([...base, e.test, '', e.mode, e.block, '', '', '', e.x ?? '', e.y ?? '', '', e.response ?? '', '', e.type, '', '', e.t_ms]));
   const csv = [head, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
