@@ -54,6 +54,9 @@
          border: none; border-radius: 12px; background: var(--accent); color: #0f172a; cursor: pointer; }
   .btn.secondary { background: var(--line); color: var(--text); }
   .btn:disabled { opacity: .4; }
+  .btn.listen { background: transparent; border: 2px solid var(--accent); color: var(--accent); }
+  .btn.listen.speaking { background: var(--accent); color: #0f172a; }
+  .btn[hidden], .chip[hidden] { display: none; }
 
   /* ---------- Test screen ---------- */
   #screen-test { padding: 0; max-width: none; gap: 0; height: 100dvh; overflow: hidden; }
@@ -102,13 +105,17 @@
 <section id="screen-q" class="screen active">
   <h1>Reaction Time Study</h1>
   <div class="card">
-    <p>A few short questions before the test begins</p>
+    <p>Before the test, a few short questions about how you are right now.</p>
     <p><strong>All questions are optional.</strong> You can leave out any question you don't want to answer,
        or skip the whole section with the button at the bottom. Tap a selected answer again to remove it.</p>
   </div>
+  <button class="btn listen" type="button" data-listen="questions">🔊 Listen to this page</button>
+  <label class="chip" id="autoReadWrap" style="align-self:flex-start">
+    <input type="checkbox" id="autoRead"><span>🔊 Read the instructions aloud automatically</span>
+  </label>
 
   <div class="field">
-    <label class="title" for="code">Please fill in your participant number</label>
+    <label class="title" for="code">Participant number</label>
     <input type="text" id="code" autocomplete="off" autocapitalize="characters" placeholder="e.g. P01">
     <p class="muted">Needed to link your sessions together. No names are collected.</p>
   </div>
@@ -147,9 +154,9 @@
     </fieldset>
 
     <fieldset>
-      <legend>How are your energy levels coming into this session?</legend>
+      <legend>How tired do you feel right now?</legend>
       <div class="chips scale" id="tiredScale"></div>
-      <p class="muted" style="margin-top:6px">1 = extremely tired · 10 = not tired at all</p>
+      <p class="muted" style="margin-top:6px">1 = not tired at all · 10 = extremely tired</p>
     </fieldset>
   </div>
 
@@ -175,6 +182,7 @@
     Before you start: sit as you normally do, use the same device and hand as in your other sessions,
     and turn on <em>Do Not Disturb</em> so notifications don't interrupt you. You can stop at any time.
   </div>
+  <button class="btn listen" type="button" id="btnListenI" data-listen="instructions">🔊 Listen to the instructions</button>
   <button class="btn" id="btnStart">Start the try-out</button>
   <button class="btn secondary" id="btnBack">Back</button>
 </section>
@@ -219,16 +227,16 @@
    CONFIGURATION – change these values to adapt the study
    ===================================================================== */
 const CONFIG = {
-  FORMSPREE_ENDPOINT: 'https://formspree.io/f/xnpjzreo', // <- paste your Formspree form URL
-  APP_VERSION: '2.0',
+  FORMSPREE_ENDPOINT: 'https://formspree.io/f/YOUR_FORM_ID', // <- paste your Formspree form URL
+  APP_VERSION: '2.0-LR',   // LR = Left-or-Right only, with read-aloud
 
   // Session structure: ONE test per session, chosen at random
-  TEST_POOL: ['t1', 't2', 't3'], // tests that can be assigned (remove one to stop using it)
+  TEST_POOL: ['t1'],      // ONLY the 'Left or right' test is used in this version
   ASSIGNMENT: 'balanced', // 'balanced' = random, but each test comes up equally often for each participant
                           // 'random'   = pure random each session (the same test may repeat several times)
   PRACTICE_S: 30,         // try-out before the test, in seconds (does not count)
   N_BLOCKS: 3,            // the real test is split into this many parts
-  BLOCK_S: 55,            // length of each part, in seconds
+  BLOCK_S: 55,            // length of each part, in seconds (3 parts = about 3 minutes of real test)
   REST_S: 10,             // break between parts, in seconds
 
   // Timing per test (milliseconds)
@@ -250,6 +258,10 @@ const CONFIG = {
 
   // Moving ball (tests 1 and 3)
   BALL_SPEED: 0.6,          // higher = faster
+
+  // Read-aloud (uses the voice built into the participant's phone or browser)
+  SPEECH_LANG: 'en-GB',     // e.g. 'en-GB', 'en-US', 'nl-NL' (the text itself is English - see speechText())
+  SPEECH_RATE: 0.9,         // 1 = normal speed, lower = slower
 
   MIN_GAP_MIN: 60,          // warn if a session starts sooner than this after the previous one
   SHOW_RESULTS_TO_PARTICIPANT: false
@@ -314,16 +326,106 @@ function load(k, f) { try { const v = localStorage.getItem(k); return v ? JSON.p
 function todayKey() { const d = new Date(); return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`; }
 function shuffle(a) { a = [...a]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
 
+/* =====================================================================
+   READ-ALOUD  (browser text-to-speech; works offline, no data is sent anywhere)
+   ===================================================================== */
+const Reader = {
+  ok: 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window,
+  btn: null, id: 0,
+  voice() {
+    const vs = speechSynthesis.getVoices(), lang = CONFIG.SPEECH_LANG.toLowerCase(), base = lang.slice(0, 2);
+    return vs.find(v => v.lang.toLowerCase().replace('_', '-') === lang)
+        || vs.find(v => v.lang.toLowerCase().startsWith(base)) || null;
+  },
+  speak(text, btn) {
+    if (!this.ok) return;
+    this.stop();
+    const id = ++this.id, u = new SpeechSynthesisUtterance(text);
+    u.lang = CONFIG.SPEECH_LANG; u.rate = CONFIG.SPEECH_RATE;
+    const v = this.voice(); if (v) u.voice = v;
+    this.btn = btn || null;
+    if (btn) { btn.classList.add('speaking'); btn.textContent = '⏹ Stop listening'; }
+    u.onend = u.onerror = () => { if (id === this.id) this.reset(); };
+    speechSynthesis.speak(u);
+  },
+  reset() {
+    if (this.btn) { this.btn.classList.remove('speaking'); this.btn.textContent = this.btn.dataset.label; this.btn = null; }
+  },
+  stop() {
+    if (!this.ok) return;
+    this.id++; speechSynthesis.cancel(); this.reset();
+  },
+  toggle(btn, text) { (this.btn === btn) ? this.stop() : this.speak(text, btn); }
+};
+
+function totalMinutes() {
+  return Math.round((CONFIG.PRACTICE_S + CONFIG.N_BLOCKS * CONFIG.BLOCK_S + (CONFIG.N_BLOCKS - 1) * CONFIG.REST_S) / 60);
+}
+function taskSpeech() {
+  return 'The screen is split into two halves. Keep your eyes on the white ball as it moves. ' +
+         'When a yellow rectangle appears on the left or right side, press the matching button as fast as you can. ' +
+         (IS_TOUCH ? '' : 'On a computer you can also use the left and right arrow keys. ');
+}
+// The words that are spoken. Edit here if you change the on-screen text.
+function speechText(kind) {
+  if (kind === 'questions') {
+    return 'Reaction Time Study. Before the test, a few short questions about how you are right now. ' +
+           'All questions are optional. You can leave out any question you do not want to answer, ' +
+           'or skip the whole section with the button at the bottom. Tap a selected answer again to remove it. ' +
+           'First, please enter your participant number. It is needed to link your sessions together. No names are collected. ' +
+           'Then you can say which device you are using, what time of day it is, what you were doing in the last hour, ' +
+           'and how tired you feel right now, on a scale from one, not tired at all, to ten, extremely tired. ' +
+           'When you are done, press Continue.';
+  }
+  if (kind === 'instructions') {
+    return "Today's test: Left or right. " + taskSpeech() +
+           `First, a ${CONFIG.PRACTICE_S} second try-out. Before the real test starts, you will practise the exercise ` +
+           `for ${CONFIG.PRACTICE_S} seconds so you can get used to it. The try-out does not count. ` +
+           `After the try-out, the real test begins: ${CONFIG.N_BLOCKS} parts with a short break in between, ` +
+           `about ${totalMinutes()} minutes in total. ` +
+           'Before you start: sit as you normally do, use the same device and hand as in your other sessions, ' +
+           'and turn on Do Not Disturb so notifications do not interrupt you. You can stop at any time. ' +
+           'When you are ready, press Start the try-out.';
+  }
+  if (kind === 'tryoutDone') {
+    return `Try-out complete. Now the real test begins. It has ${CONFIG.N_BLOCKS} parts with a short break in between. ` +
+           'Same task as in the try-out. Respond as fast as you can. ' + taskSpeech() +
+           'When you are ready, press Start the test.';
+  }
+  return '';
+}
+function initReader() {
+  const auto = $('autoRead');
+  document.querySelectorAll('[data-listen]').forEach(b => {
+    b.dataset.label = b.textContent;
+    b.hidden = !Reader.ok;
+    b.addEventListener('click', () => Reader.toggle(b, speechText(b.dataset.listen)));
+  });
+  $('autoReadWrap').hidden = !Reader.ok;
+  auto.checked = load('rt_autoread', false) === true;
+  auto.addEventListener('change', () => store('rt_autoread', auto.checked));
+  if (Reader.ok) speechSynthesis.getVoices();   // some browsers load the voice list lazily
+  document.addEventListener('visibilitychange', () => { if (document.hidden) Reader.stop(); });
+  window.addEventListener('pagehide', () => Reader.stop());
+}
+
 function flash(text, ms = 900) {
   const m = $('message'); m.textContent = text; m.classList.add('show');
   clearTimeout(flash._t); flash._t = setTimeout(() => m.classList.remove('show'), ms);
 }
 
-function showOverlay({ html, buttonText, onClick, countdown = 0 }) {
+function showOverlay({ html, buttonText, onClick, countdown = 0, speak = '' }) {
   const o = $('overlay');
-  o.innerHTML = `${html}<div class="big" id="ovCount"></div><button class="btn" id="ovBtn">${buttonText}</button>`;
+  const listen = (speak && Reader.ok)
+    ? '<button class="btn listen" type="button" id="ovListen" data-label="🔊 Listen to the instructions">🔊 Listen to the instructions</button>' : '';
+  o.innerHTML = `${html}<div class="big" id="ovCount"></div>${listen}<button class="btn" id="ovBtn">${buttonText}</button>`;
   o.classList.add('show');
   const btn = $('ovBtn'), cnt = $('ovCount');
+  if (listen) {
+    const lb = $('ovListen');
+    lb.onclick = () => Reader.toggle(lb, speak);
+    if ($('autoRead').checked) Reader.speak(speak, lb);
+  }
   if (countdown > 0) {
     btn.disabled = true; let left = countdown; cnt.textContent = left;
     const iv = setInterval(() => {
@@ -331,7 +433,7 @@ function showOverlay({ html, buttonText, onClick, countdown = 0 }) {
       if (left <= 0) { clearInterval(iv); btn.disabled = false; }
     }, 1000);
   }
-  btn.onclick = () => { o.classList.remove('show'); onClick(); };
+  btn.onclick = () => { Reader.stop(); o.classList.remove('show'); onClick(); };
 }
 
 /* =====================================================================
@@ -339,6 +441,7 @@ function showOverlay({ html, buttonText, onClick, countdown = 0 }) {
    ===================================================================== */
 const lastRadio = {};
 function initQuestions() {
+  initReader();
   $('tiredScale').innerHTML = Array.from({ length: 10 }, (_, i) =>
     `<label class="chip"><input type="radio" name="tired" value="${i + 1}"><span>${i + 1}</span></label>`).join('');
 
@@ -426,17 +529,19 @@ function submitQuestions(skipped) {
   $('instrTitle').textContent = `Today's test: ${TEST_INFO[S.test].name}`;
   $('instrTest').innerHTML = TEST_INFO[S.test].text(S.t3Variant);
   showScreen('screen-instructions');
+  if ($('autoRead').checked) Reader.speak(speechText('instructions'), $('btnListenI'));
 }
 
 $('btnQContinue').addEventListener('click', () => submitQuestions(false));
 $('btnQSkip').addEventListener('click', () => submitQuestions(true));
-$('btnBack').addEventListener('click', () => showScreen('screen-q'));
+$('btnBack').addEventListener('click', () => { Reader.stop(); showScreen('screen-q'); });
 $('btnStart').addEventListener('click', () => startSession());
 
 /* =====================================================================
    SESSION FLOW
    ===================================================================== */
 async function startSession() {
+  Reader.stop();
   S.trials = []; S.events = []; S.inputs = new Set(); S.block = 0;
   showScreen('screen-test');
 
@@ -454,6 +559,7 @@ async function startSession() {
              <p>Same task as in the try-out – respond as fast as you can.</p>
              <div class="card" style="text-align:left">${TEST_INFO[S.test].text(S.t3Variant)}</div>`,
       buttonText: 'Start the test',
+      speak: speechText('tryoutDone'),
       onClick: () => { S.block = 1; runBlock(); }
     });
   });
